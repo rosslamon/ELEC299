@@ -1,4 +1,4 @@
-include <Servo.h>
+#include <Servo.h>
 #define led 8
 #define button 9
 #define E1 6
@@ -11,19 +11,23 @@ include <Servo.h>
 
 int voltage;   //Potentiometer
 int val;       //Button state
-int encoderR, encoderL;
 int encoderRCount = 0; //Number of times encoder was trigered
 int encoderLCount = 0;
-int encoderRLastState = 0;
-int encoderLLastState = 0;
 unsigned long currentTime;
-float wheelSpeedR, wheelSpeedL;
 float lastTime;
+float wheelSpeedR, wheelSpeedL;
+float desiredSpeed
+float linWheelSpeedR, linWheelSpeedL;
+int correctFactorR, correctFactorL;
+
+
+//Function prototype
 void goBackwards();
 void goForwards();
 void sensePress();
 void countEncoderL();
 void countEncoderR();
+void checkRight()
 
 void setup() {
   // put your setup code here, to run once:
@@ -44,38 +48,40 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  //interrupts(); //enable interupts
-  //currentTime = millis();
   delay(500); //number of time since the program has started
   val = digitalRead(button);
   // Serial.println(currentTime);
   sensePress();
 
-  //encoderRLastState = encoderR;
-  //encoderLLastState = encoderL;
-
-
 }
 
 //All functions
+void checkRight() {
+  encoderRCount++;
+  currentTime = millis();
+  wheelSpeedR = (((float)encoderRCount / (float)16) / ((float)currentTime / (float)1000)); //AVG Wheel speed in revs per sec
+  //Wheelspeed*radius is speed
+  linWheelSpeedR = wheelSpeedR*(1); //add wheel radius
+  correctFactorR = .25*(desiredSpeed - linWheelSpeedR);
+  analogWrite(E1, (150+correctFactorR));
 
-//Can add a encodercount last state to get intantaneous velocity
+}
+
+
 
 void countEncoderR() {
   encoderRCount++;
   currentTime = millis();
- // Serial.println(encoderRCount);
-  //Serial.println(currentTime);
-  wheelSpeedR = (((float)encoderRCount / (float)16) / ((float)currentTime/(float)1000)); //AVG Wheel speed in revs per sec
+  wheelSpeedR = (((float)encoderRCount / (float)16) / ((float)currentTime / (float)1000)); //AVG Wheel speed in revs per sec
   Serial.print(wheelSpeedR);
   Serial.print("     ");
 }
 
 void countEncoderL() {
   encoderLCount++;
-    currentTime = millis();
-  wheelSpeedL = (((float)encoderLCount / (float)16) / ((float)currentTime/(float)1000)); //AVG Wheel speed in revs per sec
-   Serial.println(wheelSpeedL);
+  currentTime = millis();
+  wheelSpeedL = (((float)encoderLCount / (float)16) / ((float)currentTime / (float)1000)); //AVG Wheel speed in revs per sec
+  Serial.println(wheelSpeedL);
 }
 
 void sensePress() {
