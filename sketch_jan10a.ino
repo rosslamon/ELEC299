@@ -1,23 +1,25 @@
-#include <Servo.h>
-#define led 8
-#define button 9
+#include <Arduino_LSM6DS3.h>
+
 #define E1 6
 #define M1 7
 #define E2 5
 #define M2 4
-#define potVolt 10
 #define encode1 2  //encoder state 
 #define encode2 3
 
-int voltage;   //Potentiometer
-int val;       //Button state
+//IMU variables
+float imuSpeed;
+float x, y, z;
+
+
+//Encoder variables
 int encoderRCount = 0; //Number of times encoder was trigered
 int encoderLCount = 0;
+unsigned long lastTime = 0;
 unsigned long currentTime;
-float lastTime;
 float wheelSpeedR, wheelSpeedL;
-float desiredSpeed
-float linWheelSpeedR, linWheelSpeedL;
+float desiredSpeed = 10;
+volatile float linWheelSpeedR, linWheelSpeedL;
 int correctFactorR, correctFactorL;
 
 
@@ -25,76 +27,64 @@ int correctFactorR, correctFactorL;
 void goBackwards();
 void goForwards();
 void sensePress();
-void countEncoderL();
-void countEncoderR();
-void checkRight()
+void checkRight();
+void checkLeft();
+void integrateAccel();
 
 void setup() {
   // put your setup code here, to run once:
-  pinMode(button, INPUT);
-  pinMode(potVolt , INPUT);
   pinMode(encode1, INPUT);
   pinMode(encode2, INPUT);
-  pinMode(led, OUTPUT);
   pinMode(E1 , OUTPUT);
   pinMode(E2 , OUTPUT);
   pinMode(M1 , OUTPUT);
   pinMode(M2 , OUTPUT);
-  attachInterrupt(0, countEncoderR, CHANGE); //call countEncoder when change in state occurs
-  attachInterrupt(1, countEncoderL, CHANGE);
+  attachInterrupt(0, checkRight, CHANGE); //call countEncoder when change in state occurs
+  attachInterrupt(1, checkLeft, CHANGE);
   Serial.begin(9600);
+  IMU.begin();
 
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  delay(500); //number of time since the program has started
-  val = digitalRead(button);
-  // Serial.println(currentTime);
-  sensePress();
-
+  goForwards();
+  Serial.print(linWheelSpeedL);
+  Serial.print("       ");
+  Serial.println(linWheelSpeedR);
+  integrateAccel();
+  Serial.println("IMU says");
+  Serial.print(imuSpeed);
 }
 
-//All functions
+
+///////All functions////////
+void integrateAccel() {
+  currentTime = millis();
+  if (IMU.accelerationAvailable()) {
+    IMU.readAcceleration(x, y, z);
+  }
+  imuSpeed += x * (currentTime - lastTime)/(float)1000;
+  lastTime = currentTime;
+}
+
 void checkRight() {
   encoderRCount++;
   currentTime = millis();
   wheelSpeedR = (((float)encoderRCount / (float)16) / ((float)currentTime / (float)1000)); //AVG Wheel speed in revs per sec
-  //Wheelspeed*radius is speed
-  linWheelSpeedR = wheelSpeedR*(1); //add wheel radius
-  correctFactorR = .25*(desiredSpeed - linWheelSpeedR);
-  analogWrite(E1, (150+correctFactorR));
-
+  linWheelSpeedR = wheelSpeedR * (32.5); //linear speed in mm per s
+  correctFactorR = .25 * (desiredSpeed - linWheelSpeedR);
+  analogWrite(E1, (150 + correctFactorR));
 }
 
-
-
-void countEncoderR() {
-  encoderRCount++;
-  currentTime = millis();
-  wheelSpeedR = (((float)encoderRCount / (float)16) / ((float)currentTime / (float)1000)); //AVG Wheel speed in revs per sec
-  Serial.print(wheelSpeedR);
-  Serial.print("     ");
-}
-
-void countEncoderL() {
+void checkLeft() {
   encoderLCount++;
   currentTime = millis();
   wheelSpeedL = (((float)encoderLCount / (float)16) / ((float)currentTime / (float)1000)); //AVG Wheel speed in revs per sec
-  Serial.println(wheelSpeedL);
-}
-
-void sensePress() {
-  while (val == HIGH) {
-    val = digitalRead(button);
-  }
-  goForwards();
-  delay(1500);
-  goBackwards();
-  delay(1500);
-  stopMoving();
-
-
+  //Wheelspeed*radius is speed
+  linWheelSpeedL = wheelSpeedL * (32.5); //add wheel radius
+  correctFactorR = .25 * (desiredSpeed - linWheelSpeedL);
+  analogWrite(E2, (150 + correctFactorL));
 }
 
 void stopMoving() {
